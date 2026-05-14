@@ -6,6 +6,8 @@ import {
   Timer, DownloadCloud, Plus, Folder, AlertCircle, CheckCircle2, Home,
   Trash2, MoreVertical
 } from 'lucide-react';
+import { registerSW } from 'virtual:pwa-register'; 
+registerSW({ immediate: true });
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 

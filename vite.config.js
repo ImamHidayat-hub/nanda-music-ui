@@ -1,10 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { registerSW } from 'virtual:pwa-register';
-
-// Register service worker otomatis lerr
-registerSW({ immediate: true });
 
 export default defineConfig({
   plugins: [
