@@ -9,7 +9,7 @@ import {
 import { registerSW } from 'virtual:pwa-register'; 
 registerSW({ immediate: true });
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_BASE_URL = 'https://api.nandamusic.my.id';
 
 function App() {
   const [user, setUser] = useState(localStorage.getItem('nanda_music_user') || null);
@@ -22,6 +22,10 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [songs, setSongs] = useState([]);
   
+  // 🔥 STATE BARU UNTUK HALAMAN CARIAN (BUG 1) 🔥
+  const [searchPage, setSearchPage] = useState(1);
+  const [hasMoreSearch, setHasMoreSearch] = useState(false);
+  
   const [currentSong, setCurrentSong] = useState(null);
   const [queue, setQueue] = useState([]); 
   const [currentIndex, setCurrentIndex] = useState(-1); 
@@ -30,6 +34,10 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
   const [greeting, setGreeting] = useState('');
+
+  // 🔥 STATE PENYELAMAT LAGU NYANGKUT 🔥
+  const [retryTrigger, setRetryTrigger] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -40,6 +48,12 @@ function App() {
   const [modal, setModal] = useState({ isOpen: false, type: 'alert', title: '', message: '', inputValue: '', onConfirm: null, song: null });
   const [quickPlaylistName, setQuickPlaylistName] = useState(''); 
 
+  // Reset hitungan ralat jika lagu bertukar
+  useEffect(() => {
+    setRetryCount(0);
+    setRetryTrigger(0);
+  }, [currentSong]);
+
   // === FUNGSI PEMANGGIL MODAL ===
   const showAlert = (title, message) => setModal({ isOpen: true, type: 'alert', title, message, inputValue: '', onConfirm: null, song: null });
   const showPrompt = (title, message, onConfirm) => setModal({ isOpen: true, type: 'prompt', title, message, inputValue: '', onConfirm, song: null });
@@ -49,7 +63,7 @@ function App() {
     e.stopPropagation();
     if (!user) return;
     setQuickPlaylistName('');
-    setModal({ isOpen: true, type: 'addToPlaylist', title: 'Simpan ke Playlist', message: 'Mau dimasukin ke folder mana nih sayang?', inputValue: '', onConfirm: null, song: song });
+    setModal({ isOpen: true, type: 'addToPlaylist', title: 'Simpan ke Playlist', message: 'Mau dimasukin ke folder mana nih?', inputValue: '', onConfirm: null, song: song });
   };
 
   useEffect(() => {
@@ -62,13 +76,27 @@ function App() {
       fetchPlaylists(user);
       setActiveMenu("home");
       
-      // MATA-MATA: Cek database tiap 10 detik biar keliatan lagunya nambah pas di-import
+      // MATA-MATA: Menyemak pangkalan data setiap 10 saat
       const interval = setInterval(() => {
         fetchPlaylists(user);
       }, 10000); 
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  // 🔥 PENYEGERAKAN AUTO-BARISAN (BUG 3 KILLER) 🔥
+  useEffect(() => {
+    if (currentSong && activeMenu !== 'home' && activeMenu !== 'search') {
+      const updatedPlaylist = playlists[activeMenu];
+      // Kemas kini barisan jika jumlah lagu berbeza
+      if (updatedPlaylist && updatedPlaylist.length !== queue.length) {
+        setQueue(updatedPlaylist);
+        
+        const newIndex = updatedPlaylist.findIndex(s => s.id === currentSong.id);
+        if (newIndex !== -1) setCurrentIndex(newIndex);
+      }
+    }
+  }, [playlists]); 
 
   useEffect(() => {
     if (sleepTimer !== null && sleepTimer > 0) {
@@ -78,7 +106,7 @@ function App() {
       if (audioRef.current) audioRef.current.pause(); 
       setIsPlaying(false);
       setSleepTimer(null);
-      showAlert("Sleep Timer Habis", "Waktunya habis sayang! Good night, selamat tidur! 😴");
+      showAlert("Sleep Timer Habis", "Waktunya habis! Good night, selamat tidur! 😴");
     }
   }, [sleepTimer]);
 
@@ -173,14 +201,28 @@ function App() {
     }
   };
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  // 🔥 FUNGSI CARIAN YANG TELAH DIKEMAS KINI UNTUK LOAD MORE 🔥
+  const handleSearch = async (e, page = 1) => {
+    if (e) e.preventDefault();
     if (!searchQuery) return;
-    setIsLoading(true); 
+    
+    if (page === 1) {
+      setIsLoading(true); 
+      setSongs([]); 
+    }
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/api/search?q=${searchQuery}`);
+      const response = await fetch(`${API_BASE_URL}/api/search?q=${searchQuery}&page=${page}`);
       const data = await response.json();
-      if (data.success) setSongs(data.data);
+      if (data.success) {
+        if (page === 1) {
+          setSongs(data.data);
+        } else {
+          setSongs(prev => [...prev, ...data.data]); 
+        }
+        setHasMoreSearch(data.hasMore);
+        setSearchPage(page);
+      }
     } catch (error) {
       showAlert("Error", "Gagal nyari lagu ke YouTube!");
     }
@@ -189,8 +231,7 @@ function App() {
 
   const handleImport = async (playlistName, url) => {
     if (!url) return;
-    // Kasih tau ayang kalau pesenannya lagi dibikinin
-    showAlert("Proses Import Dimulai 🚀", "Oke sayang, santai dulu aja. Lagunya bakal otomatis nambah satu per satu kok pas kamu lagi dengerin musik! 😘");
+    showAlert("Proses Import Dimulai 🚀", "Oke, santai dulu aja. Lagunya bakal otomatis nambah satu per satu kok pas kamu lagi dengerin musik!");
     
     try {
       await fetch(`${API_BASE_URL}/api/playlists/${user}/${playlistName}/import`, {
@@ -198,7 +239,6 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
       });
-      // Gausah nunggu respons data, karena datanya bakal ditarik otomatis sama MATA-MATA 10 detik di atas.
     } catch (error) {
       showAlert("Error", "Yah servernya lagi ngambek sayang.");
     }
@@ -246,6 +286,20 @@ function App() {
 
   const isSongInAnyPlaylist = (songId) => {
     return Object.values(playlists).some(folder => folder.some(s => s.id === songId));
+  };
+
+  // 🔥 FUNGSI TEKNISI CADANGAN (AUTO RETRY) 🔥
+  const handleAudioError = () => {
+    if (!currentSong) return;
+    
+    if (retryCount < 2) {
+      console.log(`⚠️ Lagu nyangkut! Nge-hit ulang diem-diem (Percobaan ${retryCount + 1})...`);
+      setRetryCount(prev => prev + 1);
+      setRetryTrigger(Date.now()); 
+    } else {
+      console.log("❌ Udah diretry 2 kali tetep budeg, nyerah deh. Skip ke lagu selanjutnya!");
+      handleNext(); 
+    }
   };
 
   // ==========================================
@@ -371,7 +425,7 @@ function App() {
         <div className="mt-8 flex-1 overflow-hidden flex flex-col">
           <div className="flex items-center justify-between text-gray-400 mb-4 px-1">
             <span className="text-xs font-bold uppercase tracking-wider">Koleksi Playlist</span>
-            <button onClick={() => showPrompt("Playlist Baru", "Mau kasih nama folder apa nih sayang?", handleCreatePlaylist)} className="hover:text-white hover:scale-110 transition"><Plus size={20} /></button>
+            <button onClick={() => showPrompt("Playlist Baru", "Mau kasih nama folder apa nih?", handleCreatePlaylist)} className="hover:text-white hover:scale-110 transition"><Plus size={20} /></button>
           </div>
           
           <div className="space-y-3 overflow-y-auto custom-scrollbar flex-1 pb-4 pr-2">
@@ -409,13 +463,13 @@ function App() {
             <div className="animate-fade-in mt-2 md:mt-0">
               <form onSubmit={handleSearch} className="relative w-full max-w-2xl mb-10">
                 <Search className="absolute left-4 top-4 text-gray-400" size={24} />
-                <input type="text" placeholder="Mau dengerin apa sayang?" className="w-full bg-[#242424] text-white rounded-full py-4 pl-14 pr-6 focus:outline-none focus:ring-2 focus:ring-green-500 transition text-lg shadow-lg" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <input type="text" placeholder="Mau dengerin apa nih?" className="w-full bg-[#242424] text-white rounded-full py-4 pl-14 pr-6 focus:outline-none focus:ring-2 focus:ring-green-500 transition text-lg shadow-lg" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </form>
 
               {activeMenu === 'home' && !isLoading && !searchQuery && (
                 <div>
                   <h2 className="text-4xl font-bold mb-2">{greeting}, {user}!</h2>
-                  <p className="text-gray-400 mb-10 text-lg">Hari ini mau dengerin lagu apa sayang?</p>
+                  <p className="text-gray-400 mb-10 text-lg">Hari ini mau dengerin lagu apa nih?</p>
                   
                   <h3 className="text-2xl font-bold mb-6 flex items-center gap-2"><Folder className="text-green-500" /> Playlist Kamu</h3>
 
@@ -442,11 +496,11 @@ function App() {
 
               {(activeMenu === 'search' || searchQuery) && (
                 <div>
-                  {isLoading && <p className="text-green-500 animate-pulse font-medium mb-6">Sabar ya sayang, lagi nyari lagunya... 🔎</p>}
+                  {isLoading && <p className="text-green-500 animate-pulse font-medium mb-6">lagi nyari lagunya... 🔎</p>}
                   {songs.length > 0 && !isLoading && (
                     <div>
                       <h3 className="text-xl font-bold mb-4">Hasil Pencarian</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-32">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                         {songs.map((song) => {
                           const isLikedGlobal = isSongInAnyPlaylist(song.id);
                           return (
@@ -464,6 +518,18 @@ function App() {
                           );
                         })}
                       </div>
+                      
+                      {/* 🔥 TOMBOL LOAD MORE 🔥 */}
+                      {hasMoreSearch && (
+                        <div className="flex justify-center mt-12 mb-32">
+                          <button 
+                            onClick={() => handleSearch(null, searchPage + 1)} 
+                            className="bg-transparent border-2 border-green-500 text-green-500 hover:bg-green-500 hover:text-black font-bold py-3 px-8 rounded-full transition shadow-lg"
+                          >
+                            Cari Lagu Lainnya...
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -478,7 +544,7 @@ function App() {
                 <h3 className="text-3xl font-bold">{activeMenu}</h3>
                 
                 <div className="ml-auto flex items-center gap-3">
-                  <button onClick={() => showPrompt("Import YouTube/Spotify", "Masukin link playlist YouTube-nya di sini sayang:", (val) => handleImport(activeMenu, val))} className="flex items-center gap-2 bg-[#282828] hover:bg-[#383838] px-4 py-2 rounded-full text-sm text-gray-300 transition">
+                  <button onClick={() => showPrompt("Import YouTube/Spotify", "Masukin link playlist YouTube/Spotify-nya di sini:", (val) => handleImport(activeMenu, val))} className="flex items-center gap-2 bg-[#282828] hover:bg-[#383838] px-4 py-2 rounded-full text-sm text-gray-300 transition">
                     <DownloadCloud size={16} className="text-green-500" /> Import
                   </button>
                   
@@ -486,7 +552,7 @@ function App() {
                     <div className="relative group">
                       <button className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-[#282828] transition"><MoreVertical size={20} /></button>
                       <div className="absolute right-0 top-full mt-2 w-48 bg-[#242424] rounded-lg shadow-xl border border-[#333] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                        <button onClick={() => showConfirm("Hapus Playlist?", `Sayang, kamu yakin mau ngehapus folder "${activeMenu}"? Semua lagu di dalamnya bakal hilang lho!`, () => handleDeletePlaylist(activeMenu))} className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-[#333] rounded-lg transition">
+                        <button onClick={() => showConfirm("Hapus Playlist?", `kamu yakin mau ngehapus folder "${activeMenu}"? Semua lagu di dalamnya bakal hilang lho!`, () => handleDeletePlaylist(activeMenu))} className="flex items-center gap-2 w-full text-left px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-[#333] rounded-lg transition">
                           <Trash2 size={16} /> Hapus Folder Ini
                         </button>
                       </div>
@@ -530,26 +596,45 @@ function App() {
           ========================================== */}
       {currentSong && (
         <div className={`fixed transition-all duration-300 ease-in-out bg-[#181818] z-[60] flex ${isPlayerExpanded ? 'inset-0 flex-col items-center justify-center p-8 bg-gradient-to-b from-[#282828] to-black' : 'bottom-0 left-0 right-0 h-24 flex-row items-center justify-between px-4 border-t border-[#282828]'}`}>
-          <audio ref={audioRef} src={`${API_BASE_URL}/api/stream/${currentSong.id}`} autoPlay onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata} onEnded={handleNext} className="hidden" />
+          
+          {/* 🔥 MESIN UTAMA PLAYER 🔥 */}
+          <audio 
+            ref={audioRef} 
+            src={`${API_BASE_URL}/api/stream/${currentSong.id}?retry=${retryTrigger}`} 
+            autoPlay 
+            onTimeUpdate={handleTimeUpdate} 
+            onLoadedMetadata={handleLoadedMetadata} 
+            onEnded={handleNext} 
+            onError={handleAudioError}
+            className="hidden" 
+          />
+
           {isPlayerExpanded && <button onClick={() => setIsPlayerExpanded(false)} className="absolute top-6 left-6 text-gray-400 hover:text-white p-2"><ChevronDown size={32} /></button>}
-          <div className={`flex items-center cursor-pointer ${isPlayerExpanded ? 'flex-col text-center w-full max-w-sm relative' : 'gap-4 w-1/3 relative'}`} onClick={() => !isPlayerExpanded && setIsPlayerExpanded(true)}>
-            <img src={currentSong.thumbnail} alt="Cover" className={`rounded object-cover shadow-2xl transition-all duration-300 ${isPlayerExpanded ? 'w-64 h-64 md:w-80 md:h-80 mb-8' : 'w-14 h-14'}`} />
-            <div className="overflow-hidden w-full flex justify-between items-center pr-4">
-              <div className="text-left overflow-hidden">
-                <h4 className={`text-white font-bold truncate ${isPlayerExpanded ? 'text-2xl mb-1 text-center' : 'text-sm'}`}>{currentSong.title}</h4>
-                <p className={`text-gray-400 truncate ${isPlayerExpanded ? 'text-lg text-center' : 'text-xs'}`}>{currentSong.artist}</p>
+          
+          <div className={`flex cursor-pointer ${isPlayerExpanded ? 'flex-col items-center text-center w-full max-w-[85%] mx-auto relative' : 'items-center gap-4 w-1/3 relative'}`} onClick={() => !isPlayerExpanded && setIsPlayerExpanded(true)}>
+            <img src={currentSong.thumbnail} alt="Cover" className={`rounded-md object-cover shadow-2xl transition-all duration-300 ${isPlayerExpanded ? 'w-64 h-64 md:w-80 md:h-80 mb-6' : 'w-14 h-14'}`} />
+            
+            <div className={`flex justify-between items-center w-full ${isPlayerExpanded ? 'flex-col' : 'pr-4 overflow-hidden'}`}>
+              <div className={`flex flex-col justify-center w-full ${isPlayerExpanded ? 'items-center' : 'text-left overflow-hidden'}`}>
+                <h4 className={`text-white w-full ${isPlayerExpanded ? 'text-2xl sm:text-3xl font-bold mb-1 break-words line-clamp-2' : 'text-sm font-medium truncate'}`}>
+                  {currentSong.title}
+                </h4>
+                <p className={`text-gray-400 w-full ${isPlayerExpanded ? 'text-lg truncate' : 'text-xs truncate'}`}>
+                  {currentSong.artist}
+                </p>
               </div>
               {!isPlayerExpanded && (
-                <button onClick={(e) => openPlaylistSelector(e, currentSong)} className={`ml-2 hover:scale-110 transition z-[70] ${isSongInAnyPlaylist(currentSong.id) ? 'text-green-500' : 'text-gray-400'}`}><Heart size={20} fill={isSongInAnyPlaylist(currentSong.id) ? "currentColor" : "none"} /></button>
+                <button onClick={(e) => openPlaylistSelector(e, currentSong)} className={`ml-2 flex-shrink-0 hover:scale-110 transition z-[70] ${isSongInAnyPlaylist(currentSong.id) ? 'text-green-500' : 'text-gray-400'}`}><Heart size={20} fill={isSongInAnyPlaylist(currentSong.id) ? "currentColor" : "none"} /></button>
               )}
             </div>
           </div>
+
           <div className={`${isPlayerExpanded ? 'w-full max-w-sm mt-8 relative' : 'w-1/3 flex flex-col items-center'}`}>
             {isPlayerExpanded && (
               <button onClick={(e) => openPlaylistSelector(e, currentSong)} className={`absolute -top-16 right-0 hover:scale-110 transition ${isSongInAnyPlaylist(currentSong.id) ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}><Heart size={28} fill={isSongInAnyPlaylist(currentSong.id) ? "currentColor" : "none"} /></button>
             )}
             <div className="flex items-center justify-between w-full px-2 md:px-0 mb-4 mt-2">
-              <div className="w-12 flex justify-start"><button onClick={() => showPrompt("Sleep Timer", "Mau matiin musik otomatis dalam berapa menit sayang?", (val) => setSleepTimer(Number(val)))} className={`hover:scale-110 transition flex items-center ${sleepTimer ? 'text-green-500' : 'text-gray-400 hover:text-white'}`} title="Sleep Timer"><Timer size={20} />{sleepTimer && <span className="text-[10px] font-bold ml-1">{sleepTimer}m</span>}</button></div>
+              <div className="w-12 flex justify-start"><button onClick={() => showPrompt("Sleep Timer", "Mau matiin musik otomatis dalam berapa menit?", (val) => setSleepTimer(Number(val)))} className={`hover:scale-110 transition flex items-center ${sleepTimer ? 'text-green-500' : 'text-gray-400 hover:text-white'}`} title="Sleep Timer"><Timer size={20} />{sleepTimer && <span className="text-[10px] font-bold ml-1">{sleepTimer}m</span>}</button></div>
               <div className="flex items-center justify-center gap-6">
                 <button onClick={handlePrev} disabled={currentIndex <= 0} className={`hover:text-white transition ${currentIndex <= 0 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400'}`}><SkipBack size={28} fill="currentColor" /></button>
                 <button onClick={togglePlay} className="bg-white text-black rounded-full p-4 hover:scale-105 transition transform shadow-lg">{isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}</button>
@@ -557,7 +642,7 @@ function App() {
               </div>
               <div className="w-12 flex justify-end"><button className="text-gray-400 hover:text-white transition"><Repeat size={20} /></button></div>
             </div>
-            {/* PROGRESS BAR DI-HIDDEN PAS PLAYER KECIL, MUNCUL PAS DI-EXPAND 🔥 */}
+            
             <div className={`${isPlayerExpanded ? 'flex' : 'hidden'} items-center gap-2 w-full mt-6`}>
               <span className="text-xs text-gray-400 min-w-[35px] text-right">{formatTime(progress)}</span>
               <input type="range" min="0" max={duration || 100} value={progress} onChange={handleSeek} className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-white hover:accent-green-500" />
