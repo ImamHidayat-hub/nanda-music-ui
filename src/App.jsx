@@ -9,7 +9,7 @@ import {
 import { registerSW } from 'virtual:pwa-register'; 
 registerSW({ immediate: true });
 
-const API_BASE_URL = 'https://api.nandamusic.my.id';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 function App() {
   const [user, setUser] = useState(localStorage.getItem('nanda_music_user') || null);
