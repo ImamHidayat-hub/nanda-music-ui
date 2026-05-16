@@ -109,7 +109,7 @@ function App() {
       if (audioRef.current) audioRef.current.pause(); 
       setIsPlaying(false);
       setSleepTimer(null);
-      showAlert("Sleep Timer Habis", "Waktunya habis! Good night, selamat tidur! 😴");
+      showAlert("Sleep Timer Habis", "Waktunya habis! Good night, selamat tidur sayangg! 😴");
     }
   }, [sleepTimer]);
 
@@ -458,13 +458,13 @@ function App() {
             <div className="animate-fade-in mt-2 md:mt-0">
               <form onSubmit={handleSearch} className="relative w-full max-w-2xl mb-10">
                 <Search className="absolute left-4 top-4 text-gray-400" size={24} />
-                <input type="text" placeholder="Mau dengerin apa nih?" className="w-full bg-[#242424] text-white rounded-full py-4 pl-14 pr-6 focus:outline-none focus:ring-2 focus:ring-green-500 transition text-lg shadow-lg" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <input type="text" placeholder="Mau dengerin apa nih sayanggg?" className="w-full bg-[#242424] text-white rounded-full py-4 pl-14 pr-6 focus:outline-none focus:ring-2 focus:ring-green-500 transition text-lg shadow-lg" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </form>
 
               {activeMenu === 'home' && !isLoading && !searchQuery && (
                 <div>
                   <h2 className="text-4xl font-bold mb-2">{greeting}, {user}!</h2>
-                  <p className="text-gray-400 mb-10 text-lg">Hari ini mau dengerin lagu apa nih?</p>
+                  <p className="text-gray-400 mb-10 text-lg">Hari ini mau dengerin lagu apa nih sayangg?</p>
                   
                   <h3 className="text-2xl font-bold mb-6 flex items-center gap-2"><Folder className="text-green-500" /> Playlist Kamu</h3>
 
@@ -491,7 +491,7 @@ function App() {
 
               {(activeMenu === 'search' || searchQuery) && (
                 <div>
-                  {isLoading && <p className="text-green-500 animate-pulse font-medium mb-6">lagi nyari lagunya... 🔎</p>}
+                  {isLoading && <p className="text-green-500 animate-pulse font-medium mb-6">Sabar ya sayangg, lagi nyari lagunya... 🔎</p>}
                   {songs.length > 0 && !isLoading && (
                     <div>
                       <h3 className="text-xl font-bold mb-4">Hasil Pencarian</h3>
@@ -630,7 +630,7 @@ function App() {
               <button onClick={(e) => openPlaylistSelector(e, currentSong)} className={`absolute -top-16 right-0 hover:scale-110 transition ${isSongInAnyPlaylist(currentSong.id) ? 'text-green-500' : 'text-gray-400 hover:text-white'}`}><Heart size={28} fill={isSongInAnyPlaylist(currentSong.id) ? "currentColor" : "none"} /></button>
             )}
             <div className="flex items-center justify-between w-full px-2 md:px-0 mb-4 mt-2">
-              <div className="w-12 flex justify-start"><button onClick={() => showPrompt("Sleep Timer", "Mau matiin musik otomatis dalam berapa menit?", (val) => setSleepTimer(Number(val)))} className={`hover:scale-110 transition flex items-center ${sleepTimer ? 'text-green-500' : 'text-gray-400 hover:text-white'}`} title="Sleep Timer"><Timer size={20} />{sleepTimer && <span className="text-[10px] font-bold ml-1">{sleepTimer}m</span>}</button></div>
+              <div className="w-12 flex justify-start"><button onClick={() => showPrompt("Sleep Timer", "Mau matiin musik otomatis dalam berapa menit sayangg?", (val) => setSleepTimer(Number(val)))} className={`hover:scale-110 transition flex items-center ${sleepTimer ? 'text-green-500' : 'text-gray-400 hover:text-white'}`} title="Sleep Timer"><Timer size={20} />{sleepTimer && <span className="text-[10px] font-bold ml-1">{sleepTimer}m</span>}</button></div>
               <div className="flex items-center justify-center gap-6">
                 <button onClick={handlePrev} disabled={currentIndex <= 0} className={`hover:text-white transition ${currentIndex <= 0 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400'}`}><SkipBack size={28} fill="currentColor" /></button>
                 <button onClick={togglePlay} className="bg-white text-black rounded-full p-4 hover:scale-105 transition transform shadow-lg">{isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}</button>
