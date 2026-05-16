@@ -37,7 +37,8 @@ function App() {
 
   // 🔥 STATE PENYELAMAT LAGU NYANGKUT 🔥
   const [retryTrigger, setRetryTrigger] = useState(0);
-  const [retryCount, setRetryCount] = useState(0);
+  //const [retryCount, setRetryCount] = useState(0);
+  const retryCountRef = useRef(0);
   const [overrideStreamId, setOverrideStreamId] = useState(null); // V1.4: Mode Ninja 🥷
 
   const audioRef = useRef(null);
@@ -51,7 +52,7 @@ function App() {
 
   // Reset hitungan ralat jika lagu bertukar
   useEffect(() => {
-    setRetryCount(0);
+    retryCountRef.current = 0; // V1.4.1: Reset alat hitung instan
     setRetryTrigger(0);
     setOverrideStreamId(null);
   }, [currentSong]);
@@ -294,31 +295,36 @@ function App() {
   const handleAudioError = async () => {
     if (!currentSong) return;
     
+    // V1.4.1: Nambahin hitungan error SECARA INSTAN tanpa nunggu delay React
+    retryCountRef.current += 1;
+    const currentErrors = retryCountRef.current;
+
     // SP 1 dan SP 2: Coba hit ulang (Siapa tau cuma ngelag)
-    if (retryCount < 2) {
-      console.log(`⚠️ Lagu nyangkut! Nge-hit ulang diem-diem (Percobaan ${retryCount + 1})...`);
-      setRetryCount(prev => prev + 1);
+    if (currentErrors < 3) {
+      console.log(`⚠️ Lagu nyangkut! Nge-hit ulang diem-diem (Percobaan ${currentErrors})...`);
       setRetryTrigger(Date.now()); 
       return;
     }
 
     // SP 3: Udah 3x gagal. Fix diblokir satpam! Waktunya Operasi Ninja! 🥷
-    if (retryCount === 2) {
+    if (currentErrors === 3) {
       console.log("❌ Udah 3x Gagal! Fix diblokir. Mulai Operasi Ninja Nyari Cadangan...");
-      setRetryCount(3); // Kunci biar ga ngeloop nyari terus
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(currentSong.title + ' ' + currentSong.artist)}`);
         const data = await response.json();
         
         if (data.success && data.data && data.data.length > 0) {
-          // Cari lagu alternatif yang ID-nya beda dari ID yang diblokir
+          // Cari lagu alternatif yang ID-nya beda
           const laguAlternatif = data.data.find(s => s.id !== currentSong.id);
           
           if (laguAlternatif) {
             console.log("🔥 Dapet Link Cadangan! Play diem-diem tanpa ganti UI:", laguAlternatif.id);
             setOverrideStreamId(laguAlternatif.id);
-            // Ganti trigger biar tag audio ngerender ulang pake ID baru
+            
+            // 🔥 SAPU BERSIH DOSA: Reset hitungan error si Ninja jadi 0 lagi biar kaga ditendang pas buffering!
+            retryCountRef.current = 0; 
+            
             setRetryTrigger(Date.now()); 
             return;
           }
@@ -328,8 +334,8 @@ function App() {
       }
     }
 
-    // Kalo sampe Operasi Ninja gagal (kaga ada video lain), nyerah deh skip aja.
-    console.log("❌ Nyerah total. Skip ke lagu selanjutnya!");
+    // Kalo pencarian Ninja gagal total, baru kita nyerah.
+    console.log("❌ Nyerah total kaga nemu cadangan. Skip ke lagu selanjutnya!");
     handleNext(); 
   };
 
