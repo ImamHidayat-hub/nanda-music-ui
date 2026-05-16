@@ -36,10 +36,10 @@ function App() {
   const [greeting, setGreeting] = useState('');
 
   // 🔥 STATE PENYELAMAT LAGU NYANGKUT 🔥
-  const [retryTrigger, setRetryTrigger] = useState(0);
+  //const [retryTrigger, setRetryTrigger] = useState(0);
   //const [retryCount, setRetryCount] = useState(0);
-  const retryCountRef = useRef(0);
-  const [overrideStreamId, setOverrideStreamId] = useState(null); // V1.4: Mode Ninja 🥷
+  //const retryCountRef = useRef(0);
+  //const [overrideStreamId, setOverrideStreamId] = useState(null); // V1.4: Mode Ninja 🥷
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -51,11 +51,11 @@ function App() {
   const [quickPlaylistName, setQuickPlaylistName] = useState(''); 
 
   // Reset hitungan ralat jika lagu bertukar
-  useEffect(() => {
+  /*useEffect(() => {
     retryCountRef.current = 0; // V1.4.1: Reset alat hitung instan
     setRetryTrigger(0);
     setOverrideStreamId(null);
-  }, [currentSong]);
+  }, [currentSong]);*/
 
   // === FUNGSI PEMANGGIL MODAL ===
   const showAlert = (title, message) => setModal({ isOpen: true, type: 'alert', title, message, inputValue: '', onConfirm: null, song: null });
@@ -291,53 +291,11 @@ function App() {
     return Object.values(playlists).some(folder => folder.some(s => s.id === songId));
   };
 
-  // 🔥 FUNGSI TEKNISI CADANGAN (AUTO RETRY) 🔥
-  const handleAudioError = async () => {
-    if (!currentSong) return;
-    
-    // V1.4.1: Nambahin hitungan error SECARA INSTAN tanpa nunggu delay React
-    retryCountRef.current += 1;
-    const currentErrors = retryCountRef.current;
-
-    // SP 1 dan SP 2: Coba hit ulang (Siapa tau cuma ngelag)
-    if (currentErrors < 3) {
-      console.log(`⚠️ Lagu nyangkut! Nge-hit ulang diem-diem (Percobaan ${currentErrors})...`);
-      setRetryTrigger(Date.now()); 
-      return;
-    }
-
-    // SP 3: Udah 3x gagal. Fix diblokir satpam! Waktunya Operasi Ninja! 🥷
-    if (currentErrors === 3) {
-      console.log("❌ Udah 3x Gagal! Fix diblokir. Mulai Operasi Ninja Nyari Cadangan...");
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(currentSong.title + ' ' + currentSong.artist)}`);
-        const data = await response.json();
-        
-        if (data.success && data.data && data.data.length > 0) {
-          // Cari lagu alternatif yang ID-nya beda
-          const laguAlternatif = data.data.find(s => s.id !== currentSong.id);
-          
-          if (laguAlternatif) {
-            console.log("🔥 Dapet Link Cadangan! Play diem-diem tanpa ganti UI:", laguAlternatif.id);
-            setOverrideStreamId(laguAlternatif.id);
-            
-            // 🔥 SAPU BERSIH DOSA: Reset hitungan error si Ninja jadi 0 lagi biar kaga ditendang pas buffering!
-            retryCountRef.current = 0; 
-            
-            setRetryTrigger(Date.now()); 
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("Gagal nyari cadangan", err);
-      }
-    }
-
-    // Kalo pencarian Ninja gagal total, baru kita nyerah.
-    console.log("❌ Nyerah total kaga nemu cadangan. Skip ke lagu selanjutnya!");
-    handleNext(); 
-  };
+ // 🔥 V1.5: Frontend cuma nerima mateng! Kalo error, berarti Backend udah nyerah.
+ const handleAudioError = () => {
+  console.log("❌ Nerima Error dari Backend! (Backend udah nyoba retry + Ninja tetep gagal). Skip aja!");
+  handleNext(); 
+};
 
   // ==========================================
   // RENDER: LAYAR LOGIN
@@ -634,11 +592,11 @@ function App() {
       {currentSong && (
         <div className={`fixed transition-all duration-300 ease-in-out bg-[#181818] z-[60] flex ${isPlayerExpanded ? 'inset-0 flex-col items-center justify-center p-8 bg-gradient-to-b from-[#282828] to-black' : 'bottom-0 left-0 right-0 h-24 flex-row items-center justify-between px-4 border-t border-[#282828]'}`}>
           
-          {/* 🔥 MESIN UTAMA PLAYER V1.4 🔥 */}
+          {/* 🔥 MESIN UTAMA PLAYER V1.5 🔥 */}
           <audio 
             ref={audioRef} 
-            // V1.4: Pake ID Ninja kalo ada, kalo kosong tetep pake ID asli!
-            src={`${API_BASE_URL}/api/stream/${overrideStreamId || currentSong.id}?retry=${retryTrigger}`} 
+            // Kirim ID asli + Judul + Artis ke Backend! 
+            src={`${API_BASE_URL}/api/stream/${currentSong.id}?title=${encodeURIComponent(currentSong.title)}&artist=${encodeURIComponent(currentSong.artist)}`} 
             autoPlay 
             onTimeUpdate={handleTimeUpdate} 
             onLoadedMetadata={handleLoadedMetadata} 
