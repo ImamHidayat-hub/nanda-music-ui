@@ -38,6 +38,7 @@ function App() {
   // 🔥 STATE PENYELAMAT LAGU NYANGKUT 🔥
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
+  const [overrideStreamId, setOverrideStreamId] = useState(null); // V1.4: Mode Ninja 🥷
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -52,6 +53,7 @@ function App() {
   useEffect(() => {
     setRetryCount(0);
     setRetryTrigger(0);
+    setOverrideStreamId(null);
   }, [currentSong]);
 
   // === FUNGSI PEMANGGIL MODAL ===
@@ -289,17 +291,46 @@ function App() {
   };
 
   // 🔥 FUNGSI TEKNISI CADANGAN (AUTO RETRY) 🔥
-  const handleAudioError = () => {
+  const handleAudioError = async () => {
     if (!currentSong) return;
     
+    // SP 1 dan SP 2: Coba hit ulang (Siapa tau cuma ngelag)
     if (retryCount < 2) {
       console.log(`⚠️ Lagu nyangkut! Nge-hit ulang diem-diem (Percobaan ${retryCount + 1})...`);
       setRetryCount(prev => prev + 1);
       setRetryTrigger(Date.now()); 
-    } else {
-      console.log("❌ Udah diretry 2 kali tetep budeg, nyerah deh. Skip ke lagu selanjutnya!");
-      handleNext(); 
+      return;
     }
+
+    // SP 3: Udah 3x gagal. Fix diblokir satpam! Waktunya Operasi Ninja! 🥷
+    if (retryCount === 2) {
+      console.log("❌ Udah 3x Gagal! Fix diblokir. Mulai Operasi Ninja Nyari Cadangan...");
+      setRetryCount(3); // Kunci biar ga ngeloop nyari terus
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(currentSong.title + ' ' + currentSong.artist)}`);
+        const data = await response.json();
+        
+        if (data.success && data.data && data.data.length > 0) {
+          // Cari lagu alternatif yang ID-nya beda dari ID yang diblokir
+          const laguAlternatif = data.data.find(s => s.id !== currentSong.id);
+          
+          if (laguAlternatif) {
+            console.log("🔥 Dapet Link Cadangan! Play diem-diem tanpa ganti UI:", laguAlternatif.id);
+            setOverrideStreamId(laguAlternatif.id);
+            // Ganti trigger biar tag audio ngerender ulang pake ID baru
+            setRetryTrigger(Date.now()); 
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Gagal nyari cadangan", err);
+      }
+    }
+
+    // Kalo sampe Operasi Ninja gagal (kaga ada video lain), nyerah deh skip aja.
+    console.log("❌ Nyerah total. Skip ke lagu selanjutnya!");
+    handleNext(); 
   };
 
   // ==========================================
@@ -597,10 +628,11 @@ function App() {
       {currentSong && (
         <div className={`fixed transition-all duration-300 ease-in-out bg-[#181818] z-[60] flex ${isPlayerExpanded ? 'inset-0 flex-col items-center justify-center p-8 bg-gradient-to-b from-[#282828] to-black' : 'bottom-0 left-0 right-0 h-24 flex-row items-center justify-between px-4 border-t border-[#282828]'}`}>
           
-          {/* 🔥 MESIN UTAMA PLAYER 🔥 */}
+          {/* 🔥 MESIN UTAMA PLAYER V1.4 🔥 */}
           <audio 
             ref={audioRef} 
-            src={`${API_BASE_URL}/api/stream/${currentSong.id}?retry=${retryTrigger}`} 
+            // V1.4: Pake ID Ninja kalo ada, kalo kosong tetep pake ID asli!
+            src={`${API_BASE_URL}/api/stream/${overrideStreamId || currentSong.id}?retry=${retryTrigger}`} 
             autoPlay 
             onTimeUpdate={handleTimeUpdate} 
             onLoadedMetadata={handleLoadedMetadata} 
