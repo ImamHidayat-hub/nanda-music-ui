@@ -30,6 +30,7 @@ function App() {
   const [queue, setQueue] = useState([]); 
   const [currentIndex, setCurrentIndex] = useState(-1); 
 
+
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
@@ -42,6 +43,9 @@ function App() {
   //const [overrideStreamId, setOverrideStreamId] = useState(null); // V1.4: Mode Ninja 🥷
   // 🔥 STATE PENANDA PRELOAD V1.6 🔥
   const hasPreloadedRef = useRef(false);
+  // 🔥 STATE MATA-MATA RADIO V1.6 🔥
+  const hasFetchedRadioRef = useRef(false);
+  const [isRadioLoading, setIsRadioLoading] = useState(false); // Buat efek loading pas emergency skip
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -52,9 +56,9 @@ function App() {
   const [modal, setModal] = useState({ isOpen: false, type: 'alert', title: '', message: '', inputValue: '', onConfirm: null, song: null });
   const [quickPlaylistName, setQuickPlaylistName] = useState(''); 
 
-  // Reset penanda preload tiap lagu bertukar
   useEffect(() => {
     hasPreloadedRef.current = false; 
+    hasFetchedRadioRef.current = false; // Reset penanda radio
   }, [currentSong]);
 
   // === FUNGSI PEMANGGIL MODAL ===
@@ -252,12 +256,23 @@ function App() {
     setQueue(listToPlay); 
     setCurrentIndex(listToPlay.findIndex(s => s.id === song.id)); 
     setCurrentSong(song); setIsPlaying(true);
+    setIsRadioMode(radioMode);
   };
 
   const handleNext = () => {
-    if (queue.length > 0 && currentIndex < queue.length - 1) {
-      const nextIndex = currentIndex + 1;
-      setCurrentIndex(nextIndex); setCurrentSong(queue[nextIndex]); setIsPlaying(true);
+    if (queue.length > 0) {
+      if (currentIndex < queue.length - 1) {
+        // Normal Next
+        const nextIndex = currentIndex + 1;
+        setCurrentIndex(nextIndex); setCurrentSong(queue[nextIndex]); setIsPlaying(true);
+      } else if (isRadioMode) {
+        // 🔥 EMERGENCY SKIP CUMA JALAN KALO MODE RADIO 🔥
+        console.log("🚨 Emergency Skip! Langsung maksa nyari radio...");
+        fetchRecommendation(currentSong, true); 
+      } else {
+        // 🔥 KALO INI PLAYLIST CEWEK LU DAN LAGU UDAH ABIS, STOP AJA KAGA USAH NYARI RADIO! 🔥
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -278,23 +293,23 @@ function App() {
     if (!audioRef.current) return;
     const { currentTime, duration } = audioRef.current;
     
-    // 1. Ini fungsi asli lu buat ngejalanin progress bar
     setProgress(currentTime);
 
-    // 🔥 2. LOGIKA MATA-MATA PRELOAD V1.6 🔥
-    // Kalo sisa waktu <= 15 detik DAN belom pernah nge-preload di lagu ini
+    // 🔥 1. MATA-MATA RADIO V1.6 (Tunggu 10 Detik!) 🔥
+    // Kalo udah 10 detik + lagu terakhir + belom narik radio + SAKLAR RADIO NYALA!
+    if (currentTime >= 10 && currentIndex === queue.length - 1 && !hasFetchedRadioRef.current && isRadioMode) {
+      hasFetchedRadioRef.current = true;
+      console.log("📻 Detik ke-10! Mode Radio Aktif, diem-diem nyari rekomendasi...");
+      fetchRecommendation(currentSong, false); 
+    }
+
+    // 🔥 2. MATA-MATA PRELOAD V1.6 (Sisa 15 detik) 🔥
     if (duration && (duration - currentTime) <= 15 && !hasPreloadedRef.current) {
-      hasPreloadedRef.current = true; // Langsung kunci biar kaga nyepam!
-      
-      const nextIndex = currentIndex + 1; // Cari urutan lagu selanjutnya
-      
+      hasPreloadedRef.current = true; 
+      const nextIndex = currentIndex + 1; 
       if (nextIndex < queue.length) { 
         const nextSong = queue[nextIndex];
-        console.log(`🤫 Sisa 15 detik! Diem-diem nyiapin lagu: ${nextSong.title}`);
-        
-        // Tembak endpoint preload di Backend
-        fetch(`${API_BASE_URL}/api/preload/${nextSong.id}`)
-          .catch(err => console.error("Gagal ngirim surat preload:", err));
+        fetch(`${API_BASE_URL}/api/preload/${nextSong.id}`).catch(err => console.error(err));
       }
     }
   };
@@ -522,7 +537,7 @@ function App() {
                         {songs.map((song) => {
                           const isLikedGlobal = isSongInAnyPlaylist(song.id);
                           return (
-                            <div key={song.id} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, songs)}>
+                            <div key={song.id} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, songs, true)}>
                               <div className="relative mb-4">
                                 <img src={song.thumbnail} alt={song.title} className="w-full aspect-square object-cover rounded-md shadow-lg" />
                                 <button className="absolute bottom-2 right-2 bg-green-500 rounded-full p-3 text-black opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0 shadow-xl"><Play fill="black" size={20} /></button>
@@ -589,7 +604,7 @@ function App() {
                   {currentPlaylistData.map((song) => {
                     const isLikedGlobal = isSongInAnyPlaylist(song.id);
                     return (
-                      <div key={song.id} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, currentPlaylistData)}>
+                      <div key={song.id} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, currentPlaylistData, false)}>
                         <div className="relative mb-4">
                           <img src={song.thumbnail} alt={song.title} className="w-full aspect-square object-cover rounded-md shadow-lg" />
                           <button className="absolute bottom-2 right-2 bg-green-500 rounded-full p-3 text-black opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0 shadow-xl"><Play fill="black" size={20} /></button>
