@@ -309,6 +309,12 @@ function App() {
     if (isRemoteMode) {
       console.log("📱 [HP] Ngirim lagu ke PC...");
       socket.emit('remote_command', { username: user, command: 'PLAY_SONG', data: { song, currentList, radioMode } });
+
+      // 🔥 2. FAKE UI: Munculin Player di HP lu walau kaga ada audio muter!
+      setCurrentSong(song);
+      setQueue(sourceQueue);
+      setCurrentIndex(index);
+      setIsPlaying(true);
       return; // STOP! Biar HP lu kaga muterin lagunya
     }
     const listToPlay = currentList || [song];
@@ -351,6 +357,20 @@ function App() {
   };
 
   const handleNext = () => {
+    if (isRemoteMode) {
+      // 1. Suruh PC ganti lagu ke selanjutnya
+      socket.emit('remote_command', { username: user, command: 'next' });
+      
+      // 2. FAKE UI: Ganti judul lagu dan gambar di HP lu biar sesuai urutan antrean
+      if (currentIndex < queue.length - 1) {
+        const nextIndex = currentIndex + 1;
+        setCurrentIndex(nextIndex);
+        setCurrentSong(queue[nextIndex]);
+        setIsPlaying(true);
+      }
+      return;
+    }
+    
     if (queue.length > 0) {
       if (currentIndex < queue.length - 1) {
         // Normal Next
@@ -375,6 +395,17 @@ function App() {
   };
 
   const togglePlay = () => {
+    if (isRemoteMode) {
+      // 1. Suruh PC Pause/Play
+      socket.emit('remote_command', { 
+        username: user, 
+        command: isPlaying ? 'pause' : 'resume' // atau 'play', sesuaikan sama kodingan server.js lu
+      });
+      
+      // 2. FAKE UI: Ganti icon di HP lu biar berubah dari ⏸️ ke ▶️
+      setIsPlaying(!isPlaying);
+      return;
+    }
     if (!audioRef.current) return;
     if (isPlaying) audioRef.current.pause(); else audioRef.current.play();
     setIsPlaying(!isPlaying);
