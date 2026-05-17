@@ -563,6 +563,49 @@ function App() {
         </div>
 
         <div className={`mt-auto transition-all pt-4 ${currentSong ? 'pb-24' : 'pb-0'}`}>
+        <div className={`mt-auto transition-all pt-4 ${currentSong ? 'pb-24' : 'pb-0'}`}>
+  
+  {/* 🔥 DUA TOMBOL REMOTE & HOST (SEBELAHAN) 🔥 */}
+  <div className="flex gap-2 mb-3">
+    
+    {/* 1. TOMBOL JADI PC (TV) */}
+    <button 
+      onClick={() => {
+        const val = !isHostMode;
+        setIsHostMode(val); 
+        localStorage.setItem('nanda_music_host', val);
+        if(val) setIsRemoteMode(false);
+      }}
+      className={`flex-1 p-2 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 border ${
+        isHostMode ? 'text-green-400 bg-green-500/10 border-green-500/30' : 'text-gray-400 bg-[#181818] border-[#282828] hover:text-white hover:bg-[#282828]'
+      }`}
+      title="Jadikan PC ini sebagai Speaker"
+    >
+      <Tv size={16} />
+    </button>
+
+    {/* 2. TOMBOL JADI HP (CAST) */}
+    <button 
+      onClick={() => {
+        setIsRemoteMode(!isRemoteMode);
+        if(!isRemoteMode) { 
+          setIsHostMode(false); 
+          localStorage.setItem('nanda_music_host', 'false'); 
+          if(audioRef.current) audioRef.current.pause(); // Logika mute HP lu yg sempet ilang!
+        }
+      }}
+      className={`flex-1 p-2 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 border ${
+        isRemoteMode ? 'text-blue-400 bg-blue-500/10 border-blue-500/30' : 'text-gray-400 bg-[#181818] border-[#282828] hover:text-white hover:bg-[#282828]'
+      }`}
+      title="Jadikan HP ini sebagai Remote"
+    >
+      <Cast size={16} />
+    </button>
+
+  </div>
+
+
+</div>
           <div className="bg-[#181818] p-3 rounded-lg flex justify-between items-center border border-[#282828]">
             <span className="text-sm font-medium truncate">{user}</span>
             <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-white">Logout</button>
@@ -714,39 +757,7 @@ function App() {
           )}
         </div>
       </div>
-      {/* 🔥 TOMBOL SULTAN (MELAYANG DI POJOK KANAN BAWAH) 🔥 */}
-      {user && (
-        <div className="fixed bottom-32 right-4 flex flex-col gap-3 z-50">
-          {/* Tombol Jadi PC (TV) */}
-          <button 
-            onClick={() => {
-              const val = !isHostMode;
-              setIsHostMode(val); localStorage.setItem('nanda_music_host', val);
-              if(val) setIsRemoteMode(false);
-            }}
-            className={`p-3 rounded-full shadow-lg transition ${isHostMode ? 'bg-green-500 text-black shadow-green-500/50' : 'bg-[#282828] text-white hover:bg-gray-700'}`}
-            title="Jadikan PC ini sebagai Speaker (Host)"
-          >
-            <Tv size={24} />
-          </button>
-          
-          {/* Tombol Jadi HP (Remote) */}
-          <button 
-            onClick={() => {
-              setIsRemoteMode(!isRemoteMode);
-              if(!isRemoteMode) { 
-                setIsHostMode(false); localStorage.setItem('nanda_music_host', 'false'); 
-                if(audioRef.current) audioRef.current.pause(); // Langsung mute HP lu
-              }
-            }}
-            className={`p-3 rounded-full shadow-lg transition ${isRemoteMode ? 'bg-blue-500 text-white animate-pulse shadow-blue-500/50' : 'bg-[#282828] text-white hover:bg-gray-700'}`}
-            title="Jadikan HP ini sebagai Remote Control"
-          >
-            <Cast size={24} />
-          </button>
-        </div>
-      )}
-
+      
       {/* ==========================================
           PLAYER
           ========================================== */}
