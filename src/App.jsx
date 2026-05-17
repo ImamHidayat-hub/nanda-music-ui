@@ -4,12 +4,15 @@ import {
   ChevronUp, ChevronDown, User, Lock, 
   SkipBack, SkipForward, Shuffle, Repeat,
   Timer, DownloadCloud, Plus, Folder, AlertCircle, CheckCircle2, Home,
-  Trash2, MoreVertical
+  Trash2, MoreVertical, Tv, Cast
 } from 'lucide-react';
 import { registerSW } from 'virtual:pwa-register'; 
 registerSW({ immediate: true });
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+// 2. Baru deh mesin socket-nya lu suruh nyambung ke alamat itu
+import { io } from 'socket.io-client';
+const socket = io(API_BASE_URL, { autoConnect: false });
 
 function App() {
   const [user, setUser] = useState(localStorage.getItem('nanda_music_user') || null);
@@ -47,6 +50,9 @@ function App() {
   // 🔥 STATE MATA-MATA RADIO V1.6 🔥
   const hasFetchedRadioRef = useRef(false);
   const [isRadioLoading, setIsRadioLoading] = useState(false); // Buat efek loading pas emergency skip
+  // 🔥 SAKLAR MODE SULTAN V1.7 🔥
+  const [isHostMode, setIsHostMode] = useState(localStorage.getItem('nanda_music_host') === 'true');
+  const [isRemoteMode, setIsRemoteMode] = useState(false);
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -117,6 +123,52 @@ function App() {
       showAlert("Sleep Timer Habis", "Waktunya habis! Good night, selamat tidur sayangg! 😴");
     }
   }, [sleepTimer]);
+
+  // 🔥 OTAK WALKIE-TALKIE V1.7 🔥
+  useEffect(() => {
+    if (!user) return; // Kalo belom login, kaga usah nyambung kabel
+
+    if (isHostMode || isRemoteMode) {
+      socket.connect();
+      const role = isHostMode ? 'host' : 'remote';
+      socket.emit('join_room', { username: user, role: role });
+    } else {
+      socket.disconnect();
+    }
+
+    // 1. Kalo PC lu (Host) dapet "SMS" Perintah dari HP
+    const handleCommand = ({ command, data }) => {
+      console.log(`🖥️ [PC] Dapet perintah dari HP: ${command}`);
+      if (command === 'PLAY_SONG') {
+        playSong(data.song, data.currentList, data.radioMode);
+      } else if (command === 'NEXT_SONG') {
+        handleNext();
+      } else if (command === 'TOGGLE_PLAY') {
+        if (audioRef.current) {
+          audioRef.current.paused ? audioRef.current.play() : audioRef.current.pause();
+        }
+      }
+    };
+
+    // 2. Kalo HP lu (Remote) dapet "Update Layar" dari PC
+    const handleUpdate = (status) => {
+      if (isRemoteMode) {
+        if (status.currentSong) setCurrentSong(status.currentSong);
+        setIsPlaying(status.isPlaying);
+        setProgress(status.progress);
+        // Kita paksa matiin audio di HP biar kaga dobel suaranya!
+        if (audioRef.current) audioRef.current.pause(); 
+      }
+    };
+
+    socket.on('execute_command', handleCommand);
+    socket.on('update_remote_ui', handleUpdate);
+
+    return () => {
+      socket.off('execute_command', handleCommand);
+      socket.off('update_remote_ui', handleUpdate);
+    };
+  }, [user, isHostMode, isRemoteMode]);
 
   const fetchPlaylists = async (username) => {
     try {
@@ -253,6 +305,12 @@ function App() {
   };
 
   const playSong = (song, currentList, radioMode = false) => {
+    // 🔥 KALO INI HP (REMOTE), JANGAN PUTER! KIRIM SMS KE PC AJA! 🔥
+    if (isRemoteMode) {
+      console.log("📱 [HP] Ngirim lagu ke PC...");
+      socket.emit('remote_command', { username: user, command: 'PLAY_SONG', data: { song, currentList, radioMode } });
+      return; // STOP! Biar HP lu kaga muterin lagunya
+    }
     const listToPlay = currentList || [song];
     setQueue(listToPlay); 
     setCurrentIndex(listToPlay.findIndex(s => s.id === song.id)); 
@@ -656,6 +714,38 @@ function App() {
           )}
         </div>
       </div>
+      {/* 🔥 TOMBOL SULTAN (MELAYANG DI POJOK KANAN BAWAH) 🔥 */}
+      {user && (
+        <div className="fixed bottom-32 right-4 flex flex-col gap-3 z-50">
+          {/* Tombol Jadi PC (TV) */}
+          <button 
+            onClick={() => {
+              const val = !isHostMode;
+              setIsHostMode(val); localStorage.setItem('nanda_music_host', val);
+              if(val) setIsRemoteMode(false);
+            }}
+            className={`p-3 rounded-full shadow-lg transition ${isHostMode ? 'bg-green-500 text-black shadow-green-500/50' : 'bg-[#282828] text-white hover:bg-gray-700'}`}
+            title="Jadikan PC ini sebagai Speaker (Host)"
+          >
+            <Tv size={24} />
+          </button>
+          
+          {/* Tombol Jadi HP (Remote) */}
+          <button 
+            onClick={() => {
+              setIsRemoteMode(!isRemoteMode);
+              if(!isRemoteMode) { 
+                setIsHostMode(false); localStorage.setItem('nanda_music_host', 'false'); 
+                if(audioRef.current) audioRef.current.pause(); // Langsung mute HP lu
+              }
+            }}
+            className={`p-3 rounded-full shadow-lg transition ${isRemoteMode ? 'bg-blue-500 text-white animate-pulse shadow-blue-500/50' : 'bg-[#282828] text-white hover:bg-gray-700'}`}
+            title="Jadikan HP ini sebagai Remote Control"
+          >
+            <Cast size={24} />
+          </button>
+        </div>
+      )}
 
       {/* ==========================================
           PLAYER
