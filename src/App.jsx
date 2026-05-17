@@ -252,12 +252,13 @@ function App() {
     }
   };
 
-  const playSong = (song, currentList) => {
+  const playSong = (song, currentList, radioMode = false) => {
     const listToPlay = currentList || [song];
     setQueue(listToPlay); 
     setCurrentIndex(listToPlay.findIndex(s => s.id === song.id)); 
-    setCurrentSong(song); setIsPlaying(true);
-    setIsRadioMode(radioMode);
+    setCurrentSong(song); 
+    setIsPlaying(true);
+    setIsRadioMode(radioMode); // 🔥 Nah sekarang dia tau radioMode itu dapet dari parameter atas!
   };
 
   const handleNext = () => {
