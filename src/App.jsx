@@ -260,6 +260,37 @@ function App() {
     setIsPlaying(true);
     setIsRadioMode(radioMode); // 🔥 Nah sekarang dia tau radioMode itu dapet dari parameter atas!
   };
+  
+  // 🔥 FUNGSI NARIK RADIO V1.6 🔥
+  const fetchRecommendation = async (song, autoPlay = false) => {
+    try {
+      if (autoPlay) setIsRadioLoading(true); 
+      
+      const res = await fetch(`${API_BASE_URL}/api/recommend?title=${encodeURIComponent(song.title)}&artist=${encodeURIComponent(song.artist)}&currentId=${song.id}`);
+      const data = await res.json();
+      
+      if (data.success) {
+        setQueue(prev => {
+          const newQueue = [...prev, data.data]; 
+          
+          if (autoPlay) {
+            const nextIndex = newQueue.length - 1;
+            setCurrentIndex(nextIndex);
+            setCurrentSong(newQueue[nextIndex]);
+            setIsPlaying(true);
+          }
+          return newQueue;
+        });
+        console.log(`🎵 Lagu Rekomendasi "${data.data.title}" udah masuk antrean!`);
+      } else {
+        console.log("Kaga nemu lagu yang nyambung lerr.");
+      }
+    } catch (err) {
+      console.error("Gagal nyari radio:", err);
+    } finally {
+      if (autoPlay) setIsRadioLoading(false);
+    }
+  };
 
   const handleNext = () => {
     if (queue.length > 0) {
