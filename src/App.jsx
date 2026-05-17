@@ -539,7 +539,7 @@ function App() {
                         {songs.map((song) => {
                           const isLikedGlobal = isSongInAnyPlaylist(song.id);
                           return (
-                            <div key={song.id} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, songs, true)}>
+                            <div key={song.id} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, [songs], true)}>
                               <div className="relative mb-4">
                                 <img src={song.thumbnail} alt={song.title} className="w-full aspect-square object-cover rounded-md shadow-lg" />
                                 <button className="absolute bottom-2 right-2 bg-green-500 rounded-full p-3 text-black opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0 shadow-xl"><Play fill="black" size={20} /></button>
