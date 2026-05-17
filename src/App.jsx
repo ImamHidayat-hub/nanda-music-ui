@@ -124,9 +124,11 @@ function App() {
     }
   }, [sleepTimer]);
 
-  // 🔥 OTAK WALKIE-TALKIE V1.7 🔥
+  // ==================================================
+  // 🔥 OTAK WALKIE-TALKIE 1: URUSAN COLOK KABEL 🔥
+  // ==================================================
   useEffect(() => {
-    if (!user) return; // Kalo belom login, kaga usah nyambung kabel
+    if (!user) return; 
 
     if (isHostMode || isRemoteMode) {
       socket.connect();
@@ -135,14 +137,22 @@ function App() {
     } else {
       socket.disconnect();
     }
+  }, [user, isHostMode, isRemoteMode]); // <- Ini cuma nyala pas kabel dicolok
 
+
+  // ==================================================
+  // 🔥 OTAK WALKIE-TALKIE 2: PENERIMA SMS ANTI-AMNESIA 🔥
+  // ==================================================
+  useEffect(() => {
     // 1. Kalo PC lu (Host) dapet "SMS" Perintah dari HP
     const handleCommand = ({ command, data }) => {
       console.log(`🖥️ [PC] Dapet perintah dari HP: ${command}`);
       if (command === 'PLAY_SONG') {
         playSong(data.song, data.currentList, data.radioMode);
       } else if (command === 'NEXT_SONG') {
-        handleNext();
+        handleNext(); // 👈 Sekarang dia inget antrean lagunya!
+      } else if (command === 'PREV_SONG') {
+        handlePrev(); // 👈 Jangan lupa panggil Prev!
       } else if (command === 'TOGGLE_PLAY') {
         if (audioRef.current) {
           audioRef.current.paused ? audioRef.current.play() : audioRef.current.pause();
@@ -156,7 +166,6 @@ function App() {
         if (status.currentSong) setCurrentSong(status.currentSong);
         setIsPlaying(status.isPlaying);
         setProgress(status.progress);
-        // Kita paksa matiin audio di HP biar kaga dobel suaranya!
         if (audioRef.current) audioRef.current.pause(); 
       }
     };
@@ -168,7 +177,8 @@ function App() {
       socket.off('execute_command', handleCommand);
       socket.off('update_remote_ui', handleUpdate);
     };
-  }, [user, isHostMode, isRemoteMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }); // 🔥 RAHASIA NEGARA: KAGA ADA KURUNG SIKU DI SINI BIAR FRESH TERUS! 🔥
 
   const fetchPlaylists = async (username) => {
     try {
@@ -389,6 +399,19 @@ function App() {
   };
 
   const handlePrev = () => {
+    // 🔥 1. CEGATAN BUAT HP (REMOTE) 🔥
+    if (isRemoteMode) {
+      socket.emit('remote_command', { username: user, command: 'PREV_SONG' });
+      
+      // FAKE UI BIAR LAYAR HP GANTI
+      if (queue.length > 0 && currentIndex > 0) {
+        const prevIndex = currentIndex - 1;
+        setCurrentIndex(prevIndex); 
+        setCurrentSong(queue[prevIndex]); 
+        setIsPlaying(true);
+      }
+      return; // STOP!
+    }
     if (queue.length > 0 && currentIndex > 0) {
       const prevIndex = currentIndex - 1;
       setCurrentIndex(prevIndex); setCurrentSong(queue[prevIndex]); setIsPlaying(true);
