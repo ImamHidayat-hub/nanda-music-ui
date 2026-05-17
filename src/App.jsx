@@ -311,11 +311,12 @@ function App() {
       socket.emit('remote_command', { username: user, command: 'PLAY_SONG', data: { song, currentList, radioMode } });
 
       // 🔥 2. FAKE UI: Munculin Player di HP lu walau kaga ada audio muter!
-      setCurrentSong(song);
-      setQueue(sourceQueue);
-      setCurrentIndex(index);
+      const listToPlay = currentList || [song];
+      setQueue(listToPlay); 
+      setCurrentIndex(listToPlay.findIndex(s => s.id === song.id)); 
+      setCurrentSong(song); 
       setIsPlaying(true);
-      return; // STOP! Biar HP lu kaga muterin lagunya
+      return;// STOP! Biar HP lu kaga muterin lagunya
     }
     const listToPlay = currentList || [song];
     setQueue(listToPlay); 
@@ -358,8 +359,8 @@ function App() {
 
   const handleNext = () => {
     if (isRemoteMode) {
-      // 1. Suruh PC ganti lagu ke selanjutnya
-      socket.emit('remote_command', { username: user, command: 'next' });
+      // Ubah command jadi 'NEXT_SONG'
+      socket.emit('remote_command', { username: user, command: 'NEXT_SONG' });
       
       // 2. FAKE UI: Ganti judul lagu dan gambar di HP lu biar sesuai urutan antrean
       if (currentIndex < queue.length - 1) {
@@ -396,13 +397,8 @@ function App() {
 
   const togglePlay = () => {
     if (isRemoteMode) {
-      // 1. Suruh PC Pause/Play
-      socket.emit('remote_command', { 
-        username: user, 
-        command: isPlaying ? 'pause' : 'resume' // atau 'play', sesuaikan sama kodingan server.js lu
-      });
-      
-      // 2. FAKE UI: Ganti icon di HP lu biar berubah dari ⏸️ ke ▶️
+      // Ubah command jadi 'TOGGLE_PLAY'
+      socket.emit('remote_command', { username: user, command: 'TOGGLE_PLAY' });
       setIsPlaying(!isPlaying);
       return;
     }
@@ -799,7 +795,13 @@ function App() {
           <audio 
             ref={audioRef} 
             // Kirim ID asli + Judul + Artis ke Backend! 
-            src={`${API_BASE_URL}/api/stream/${currentSong.id}?title=${encodeURIComponent(currentSong.title)}&artist=${encodeURIComponent(currentSong.artist)}`} 
+            src={
+              isRemoteMode 
+                ? "" 
+                : currentSong 
+                  ? `${API_BASE_URL}/api/stream/${currentSong.id}?title=${encodeURIComponent(currentSong.title)}&artist=${encodeURIComponent(currentSong.artist)}` 
+                  : ""
+            }
             autoPlay 
             onTimeUpdate={handleTimeUpdate} 
             onLoadedMetadata={handleLoadedMetadata} 
