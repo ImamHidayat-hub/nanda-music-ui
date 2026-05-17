@@ -29,6 +29,7 @@ function App() {
   const [currentSong, setCurrentSong] = useState(null);
   const [queue, setQueue] = useState([]); 
   const [currentIndex, setCurrentIndex] = useState(-1); 
+  const [isRadioMode, setIsRadioMode] = useState(false);
 
 
   const [isLoading, setIsLoading] = useState(false);
