@@ -40,6 +40,8 @@ function App() {
   //const [retryCount, setRetryCount] = useState(0);
   //const retryCountRef = useRef(0);
   //const [overrideStreamId, setOverrideStreamId] = useState(null); // V1.4: Mode Ninja 🥷
+  // 🔥 STATE PENANDA PRELOAD V1.6 🔥
+  const hasPreloadedRef = useRef(false);
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -50,12 +52,10 @@ function App() {
   const [modal, setModal] = useState({ isOpen: false, type: 'alert', title: '', message: '', inputValue: '', onConfirm: null, song: null });
   const [quickPlaylistName, setQuickPlaylistName] = useState(''); 
 
-  // Reset hitungan ralat jika lagu bertukar
-  /*useEffect(() => {
-    retryCountRef.current = 0; // V1.4.1: Reset alat hitung instan
-    setRetryTrigger(0);
-    setOverrideStreamId(null);
-  }, [currentSong]);*/
+  // Reset penanda preload tiap lagu bertukar
+  useEffect(() => {
+    hasPreloadedRef.current = false; 
+  }, [currentSong]);
 
   // === FUNGSI PEMANGGIL MODAL ===
   const showAlert = (title, message) => setModal({ isOpen: true, type: 'alert', title, message, inputValue: '', onConfirm: null, song: null });
@@ -274,7 +274,30 @@ function App() {
     setIsPlaying(!isPlaying);
   };
 
-  const handleTimeUpdate = () => setProgress(audioRef.current.currentTime);
+  const handleTimeUpdate = () => {
+    if (!audioRef.current) return;
+    const { currentTime, duration } = audioRef.current;
+    
+    // 1. Ini fungsi asli lu buat ngejalanin progress bar
+    setProgress(currentTime);
+
+    // 🔥 2. LOGIKA MATA-MATA PRELOAD V1.6 🔥
+    // Kalo sisa waktu <= 15 detik DAN belom pernah nge-preload di lagu ini
+    if (duration && (duration - currentTime) <= 15 && !hasPreloadedRef.current) {
+      hasPreloadedRef.current = true; // Langsung kunci biar kaga nyepam!
+      
+      const nextIndex = currentIndex + 1; // Cari urutan lagu selanjutnya
+      
+      if (nextIndex < queue.length) { 
+        const nextSong = queue[nextIndex];
+        console.log(`🤫 Sisa 15 detik! Diem-diem nyiapin lagu: ${nextSong.title}`);
+        
+        // Tembak endpoint preload di Backend
+        fetch(`${API_BASE_URL}/api/preload/${nextSong.id}`)
+          .catch(err => console.error("Gagal ngirim surat preload:", err));
+      }
+    }
+  };
   const handleLoadedMetadata = () => setDuration(audioRef.current.duration);
   const handleSeek = (e) => {
     const time = Number(e.target.value);
