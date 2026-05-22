@@ -1,5 +1,6 @@
-import React from 'react';
-import { ChevronDown, ChevronUp, Play, Pause, SkipBack, SkipForward, Repeat, Mic, Timer, Heart } from 'lucide-react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, ChevronUp, Play, Pause, SkipBack, SkipForward, Repeat, Mic, Timer, Heart, ExternalLink } from 'lucide-react';
 
 const Player = ({
   currentSong,
@@ -34,7 +35,71 @@ const Player = ({
   handleSeek,
   formatTime
 }) => {
+  const [pipWindow, setPipWindow] = useState(null);
+
+  const togglePiP = async () => {
+    if (!('documentPictureInPicture' in window)) {
+      alert("Browser kamu belum dukung fitur Document PiP (Coba pake Chrome/Edge terbaru ya bos!)");
+      return;
+    }
+
+    if (pipWindow) {
+      pipWindow.close();
+      return;
+    }
+
+    try {
+      const pip = await window.documentPictureInPicture.requestWindow({
+        width: 400,
+        height: 600,
+      });
+
+      [...document.head.querySelectorAll('style, link[rel="stylesheet"]')].forEach((style) => {
+        pip.document.head.appendChild(style.cloneNode(true));
+      });
+      
+      pip.document.body.style.backgroundColor = '#1a1a1a';
+      pip.document.body.style.margin = '0';
+      pip.document.body.style.height = '100vh';
+
+      pip.addEventListener("pagehide", () => {
+        setPipWindow(null);
+      });
+
+      setPipWindow(pip);
+    } catch (error) {
+      console.error("Gagal buka PiP:", error);
+    }
+  };
+
   if (!currentSong) return null;
+
+  const lyricsContent = (
+    <div 
+      ref={lyricsContainerRef}
+      className="w-full h-full overflow-y-auto p-6 flex flex-col gap-8 no-scrollbar bg-[#1a1a1a]"
+      style={{ scrollBehavior: 'smooth', msOverflowStyle: 'none', scrollbarWidth: 'none' }}
+    >
+      {isLoadingLyrics ? (
+        <p className="text-green-500 animate-pulse text-center m-auto font-bold text-xl">Nyari lirik dulu bos... 🔎</p>
+      ) : lyrics.length > 0 ? (
+        lyrics.map((line, index) => {
+          const isActive = index === activeLyricIndex;
+          return (
+            <p 
+              key={index}
+              ref={isActive ? activeLyricRef : null}
+              className={`text-center font-bold transition-all duration-500 origin-center text-2xl md:text-3xl ${isActive ? 'text-white scale-110 opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'text-gray-500 opacity-40 scale-95'}`}
+            >
+              {line.text}
+            </p>
+          );
+        })
+      ) : (
+        <p className="text-gray-400 text-center m-auto font-medium">Kaga ada lirik buat lagu ini 😭</p>
+      )}
+    </div>
+  );
 
   return (
     <div className={`fixed transition-all duration-300 ease-in-out bg-[#181818] z-[60] flex ${isPlayerExpanded ? 'inset-0 flex-col items-center justify-center p-8 bg-gradient-to-b from-[#282828] to-black' : 'bottom-0 left-0 right-0 h-24 flex-row items-center justify-between px-4 border-t border-[#282828]'}`}>
@@ -63,30 +128,16 @@ const Player = ({
       <div className={`flex cursor-pointer ${isPlayerExpanded ? 'flex-col items-center text-center w-full max-w-[85%] mx-auto relative' : 'items-center gap-4 w-1/3 relative'}`} onClick={() => !isPlayerExpanded && setIsPlayerExpanded(true)}>
         <div className={`relative flex items-center justify-center overflow-hidden shadow-2xl transition-all duration-300 ${isPlayerExpanded ? 'w-64 h-64 md:w-80 md:h-80 mb-6 rounded-2xl bg-[#1a1a1a]' : 'w-14 h-14 rounded-md flex-shrink-0'}`}>
           {isKaraokeMode && isPlayerExpanded ? (
-            <div 
-              ref={lyricsContainerRef}
-              className="w-full h-full overflow-y-auto p-6 flex flex-col gap-8 no-scrollbar"
-              style={{ scrollBehavior: 'smooth', msOverflowStyle: 'none', scrollbarWidth: 'none' }}
-            >
-              {isLoadingLyrics ? (
-                <p className="text-green-500 animate-pulse text-center m-auto font-bold text-xl">Nyari lirik dulu bos... 🔎</p>
-              ) : lyrics.length > 0 ? (
-                lyrics.map((line, index) => {
-                  const isActive = index === activeLyricIndex;
-                  return (
-                    <p 
-                      key={index}
-                      ref={isActive ? activeLyricRef : null}
-                      className={`text-center font-bold transition-all duration-500 origin-center text-2xl md:text-3xl ${isActive ? 'text-white scale-110 opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'text-gray-500 opacity-40 scale-95'}`}
-                    >
-                      {line.text}
-                    </p>
-                  );
-                })
-              ) : (
-                <p className="text-gray-400 text-center m-auto font-medium">Kaga ada lirik buat lagu ini 😭</p>
-              )}
-            </div>
+            pipWindow ? (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-[#1a1a1a] p-4 text-center">
+                <ExternalLink size={48} className="text-green-500 mb-4 animate-pulse" />
+                <p className="text-white font-bold text-lg">Lirik mengambang di Overlay ✨</p>
+                <p className="text-gray-400 text-sm mt-2">Cek jendela PiP yang terbuka</p>
+                {createPortal(lyricsContent, pipWindow.document.body)}
+              </div>
+            ) : (
+              lyricsContent
+            )
           ) : (
             <img src={currentSong.thumbnail} alt={currentSong.title || "Cover"} className="w-full h-full object-cover" />
           )}
@@ -118,7 +169,14 @@ const Player = ({
             <button onClick={togglePlay} className="bg-white text-black rounded-full p-4 hover:scale-105 transition transform shadow-lg">{isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}</button>
             <button onClick={handleNext} disabled={currentIndex >= queue.length - 1} className={`hover:text-white transition ${currentIndex >= queue.length - 1 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400'}`}><SkipForward size={28} fill="currentColor" /></button>
           </div>
-          <div className="w-24 flex justify-end items-center gap-4">
+          <div className="w-32 flex justify-end items-center gap-4">
+            <button 
+              onClick={togglePiP}
+              className={`transition hover:scale-110 ${pipWindow ? 'text-green-500 animate-pulse' : 'text-gray-400 hover:text-white'}`}
+              title="PiP Overlay Lirik"
+            >
+              <ExternalLink size={20} />
+            </button>
             <button 
               onClick={() => setIsKaraokeMode(!isKaraokeMode)} 
               className={`transition hover:scale-110 ${isKaraokeMode ? 'text-green-500 animate-pulse' : 'text-gray-400 hover:text-white'}`}

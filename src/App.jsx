@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { Heart, Plus, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { registerSW } from 'virtual:pwa-register'; 
 registerSW({ immediate: true });
