@@ -1,5 +1,7 @@
 import React from 'react';
 import { Menu, Search, Folder, Play, Heart, DownloadCloud, MoreVertical, Trash2 } from 'lucide-react';
+import { usePlayer } from '../context/PlayerContext';
+import { useUI } from '../context/UIContext';
 
 const MainContent = ({
   setIsSidebarOpen,
@@ -14,16 +16,14 @@ const MainContent = ({
   playlists,
   songs,
   isSongInAnyPlaylist,
-  playSong,
-  openPlaylistSelector,
   hasMoreSearch,
   searchPage,
-  showPrompt,
   handleImport,
-  showConfirm,
   handleDeletePlaylist
 }) => {
   const currentPlaylistData = playlists[activeMenu] || [];
+  const { currentSong, isPlaying, playSong } = usePlayer();
+  const { openPlaylistSelector, showPrompt, showConfirm } = useUI();
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gradient-to-b from-[#1e1e1e] to-[#121212] overflow-y-auto relative">
@@ -90,15 +90,29 @@ const MainContent = ({
                   <div>
                     <h3 className="text-xl font-bold mb-4">Hasil Pencarian</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                      {songs.map((song) => {
+                      {songs.map((song, index) => {
                         const isLikedGlobal = isSongInAnyPlaylist(song.id);
+                        const isPlayingThisSong = currentSong?.id === song.id;
                         return (
-                          <div key={song.id} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, [song], true)}>
+                          <div key={`${song.id}-${index}`} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, [song], true)}>
                             <div className="relative mb-4">
                               <img src={song.thumbnail} alt={song.title} className="w-full aspect-square object-cover rounded-md shadow-lg" />
-                              <button className="absolute bottom-2 right-2 bg-green-500 rounded-full p-3 text-black opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0 shadow-xl">
-                                <Play fill="black" size={20} />
-                              </button>
+                              {isPlayingThisSong && isPlaying ? (
+                                <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center rounded-md">
+                                  <div className="flex gap-[2px] items-end h-6">
+                                    <div className="w-[4px] bg-green-500 animate-[eq_0.8s_ease-in-out_infinite_alternate] h-full"></div>
+                                    <div className="w-[4px] bg-green-500 animate-[eq_1.2s_ease-in-out_infinite_alternate] h-2/3"></div>
+                                    <div className="w-[4px] bg-green-500 animate-[eq_0.6s_ease-in-out_infinite_alternate] h-full"></div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition rounded-lg"></div>
+                                  <button className="absolute bottom-2 right-2 bg-green-500 rounded-full p-3 text-black opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0 shadow-xl">
+                                    <Play fill="black" size={20} />
+                                  </button>
+                                </>
+                              )}
                             </div>
                             <h3 className="font-semibold text-white truncate pr-8">{song.title}</h3>
                             <p className="text-sm text-gray-400 mt-1 truncate">{song.artist}</p>
@@ -159,13 +173,29 @@ const MainContent = ({
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-32">
-                {currentPlaylistData.map((song) => {
+                {currentPlaylistData.map((song, index) => {
                   const isLikedGlobal = isSongInAnyPlaylist(song.id);
+                  const isPlayingThisSong = currentSong?.id === song.id;
                   return (
-                    <div key={song.id} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, currentPlaylistData, false)}>
+                    <div key={`${song.id}-${index}`} className="bg-[#181818] p-4 rounded-lg hover:bg-[#282828] transition group cursor-pointer relative" onClick={() => playSong(song, currentPlaylistData, false)}>
                       <div className="relative mb-4">
                         <img src={song.thumbnail} alt={song.title} className="w-full aspect-square object-cover rounded-md shadow-lg" />
-                        <button className="absolute bottom-2 right-2 bg-green-500 rounded-full p-3 text-black opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0 shadow-xl"><Play fill="black" size={20} /></button>
+                        {isPlayingThisSong && isPlaying ? (
+                          <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center rounded-md">
+                            <div className="flex gap-[2px] items-end h-6">
+                              <div className="w-[4px] bg-green-500 animate-[eq_0.8s_ease-in-out_infinite_alternate] h-full"></div>
+                              <div className="w-[4px] bg-green-500 animate-[eq_1.2s_ease-in-out_infinite_alternate] h-2/3"></div>
+                              <div className="w-[4px] bg-green-500 animate-[eq_0.6s_ease-in-out_infinite_alternate] h-full"></div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition rounded-lg"></div>
+                            <button className="absolute bottom-2 right-2 bg-green-500 rounded-full p-3 text-black opacity-0 group-hover:opacity-100 transition translate-y-2 group-hover:translate-y-0 shadow-xl">
+                              <Play fill="black" size={20} />
+                            </button>
+                          </>
+                        )}
                       </div>
                       <h3 className="font-semibold text-white truncate pr-6">{song.title}</h3>
                       <p className="text-sm text-gray-400 mt-1 truncate">{song.artist}</p>
